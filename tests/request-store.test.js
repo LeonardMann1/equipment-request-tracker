@@ -15,6 +15,7 @@ const validInput = {
   department: "Operations",
   equipment: "  Laptop  ",
   neededBy: "2026-09-15",
+  priority: "High",
   reason: "  Replace a failed field computer.  ",
 };
 
@@ -42,9 +43,20 @@ test("createRequest trims input and adds system fields", () => {
     department: "Operations",
     equipment: "Laptop",
     neededBy: "2026-09-15",
+    priority: "High",
     reason: "Replace a failed field computer.",
     createdAt: "2026-08-17T12:00:00.000Z",
   });
+});
+
+test("createRequest defaults a missing priority to Normal", () => {
+  const { priority, ...inputWithoutPriority } = validInput;
+  const request = createRequest(inputWithoutPriority, {
+    id: "request-default-priority",
+    now: new Date("2026-08-17T12:00:00.000Z"),
+  });
+
+  assert.equal(request.priority, "Normal");
 });
 
 test("createRequest reports missing required fields", () => {
@@ -53,6 +65,17 @@ test("createRequest reports missing required fields", () => {
     (error) => {
       assert.ok(error instanceof RequestValidationError);
       assert.deepEqual(Object.keys(error.errors), ["requester", "equipment"]);
+      return true;
+    },
+  );
+});
+
+test("createRequest rejects an unsupported priority", () => {
+  assert.throws(
+    () => createRequest({ ...validInput, priority: "Urgent" }),
+    (error) => {
+      assert.ok(error instanceof RequestValidationError);
+      assert.deepEqual(error.errors, { priority: "Select a valid priority." });
       return true;
     },
   );
@@ -83,4 +106,15 @@ test("loadRequests safely handles damaged stored data", () => {
   storage.setItem(STORAGE_KEY, "not-json");
 
   assert.deepEqual(loadRequests(storage), []);
+});
+
+test("loadRequests assigns Normal priority to existing stored requests", () => {
+  const storage = new MemoryStorage();
+  const { priority, ...legacyRequest } = createRequest(validInput, {
+    id: "legacy-request",
+    now: new Date("2026-08-17T12:00:00.000Z"),
+  });
+  storage.setItem(STORAGE_KEY, JSON.stringify([legacyRequest]));
+
+  assert.deepEqual(loadRequests(storage), [{ ...legacyRequest, priority: "Normal" }]);
 });

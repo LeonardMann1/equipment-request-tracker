@@ -1,4 +1,5 @@
 export const STORAGE_KEY = "mis4173-equipment-requests";
+const PRIORITIES = ["Low", "Normal", "High"];
 
 export class RequestValidationError extends Error {
   constructor(errors) {
@@ -20,6 +21,9 @@ export function validateRequest(input = {}) {
   if (!clean(input.equipment)) errors.equipment = "Enter the equipment needed.";
   if (!clean(input.neededBy)) errors.neededBy = "Select the date needed.";
   if (!clean(input.reason)) errors.reason = "Enter a business reason.";
+  if (input.priority !== undefined && !PRIORITIES.includes(clean(input.priority))) {
+    errors.priority = "Select a valid priority.";
+  }
 
   return errors;
 }
@@ -43,6 +47,7 @@ export function createRequest(input, options = {}) {
     department: clean(input.department),
     equipment: clean(input.equipment),
     neededBy: clean(input.neededBy),
+    priority: clean(input.priority) || "Normal",
     reason: clean(input.reason),
     createdAt: now.toISOString(),
   };
@@ -60,7 +65,7 @@ export function loadRequests(storage = globalThis.localStorage) {
     if (!stored) return [];
 
     const parsed = JSON.parse(stored);
-    return Array.isArray(parsed) ? parsed.filter(isRequestRecord) : [];
+    return Array.isArray(parsed) ? parsed.filter(isRequestRecord).map(normalizeRequest) : [];
   } catch {
     return [];
   }
@@ -81,6 +86,14 @@ function isRequestRecord(value) {
     typeof value.equipment === "string" &&
     typeof value.neededBy === "string" &&
     typeof value.reason === "string" &&
-    typeof value.createdAt === "string"
+    typeof value.createdAt === "string" &&
+    (value.priority === undefined || PRIORITIES.includes(value.priority))
   );
+}
+
+function normalizeRequest(request) {
+  return {
+    ...request,
+    priority: request.priority ?? "Normal",
+  };
 }
